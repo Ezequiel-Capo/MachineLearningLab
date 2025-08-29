@@ -44,12 +44,15 @@ df_hum["fecha"] = df_hum["fecha"].dt.date
 df_hum["fecha"] = pd.to_datetime(df_hum["fecha"])
 df_hum = df_hum.drop(["Unnamed: 3","Unnamed: 4"], axis=1)
 
+#Genero a partir de los datos un solo dato por dia, usando el promedio de las medidas
 df_hum = df_hum.groupby(df_hum["fecha"]).agg({
   "hum_carrasco" : "mean",
   "hum_salto" : "mean"
 })
 
 df_global = pd.merge(df_global, df_hum, on="fecha", how="left")
+
+#=================
 
 #debug
 print(df_lluvia.head())
