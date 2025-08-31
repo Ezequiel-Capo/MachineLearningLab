@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from math import log2
 
-cols_excluir = ["fecha"]  # columnas a excluir
+cols_excluir = ["dia_lluvioso", "fecha"]  # columnas a excluir
 
 def entropia(S, objetivo):
     col_objetivo = S[objetivo].dropna()  #! TEMPORAL borro NaN
@@ -38,10 +38,12 @@ def ganancia(S, A, objetivo):
 
 def ganancias(S, objetivo):
     atributos = list(S.columns)
+    for col in cols_excluir:
+        if col in atributos:
+            atributos.remove(col)
     g = {}
     for a in atributos:
-        if a != objetivo or a not in cols_excluir:
-            g[a] = ganancia(S, a, objetivo)
+        g[a] = ganancia(S, a, objetivo)
     return g
 
 
