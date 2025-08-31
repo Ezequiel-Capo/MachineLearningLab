@@ -4,7 +4,7 @@ import numpy as np
 #====PREPROCESAMIENTO======
 
 #=======Lluvia.csv=========
-df_lluvia = pd.read_csv("Lluvia.csv", sep = ";")
+df_lluvia = pd.read_csv("Lluvia.csv", sep = ";") 
 
 df_lluvia = df_lluvia.rename(columns = {
   "Estación" : "estacion",
@@ -12,7 +12,7 @@ df_lluvia = df_lluvia.rename(columns = {
   "Fecha" : "fecha",
   "[mm]" : "precip_mm",
   "Comentario" : "coment_lluv"
-})
+}) 
 
 #Arreglo los tipos
 df_lluvia["fecha"] = pd.to_datetime(df_lluvia["fecha"], format = "%d/%m/%Y")
@@ -27,9 +27,23 @@ precip_minima = 1.0
 df_lluvia["dia_lluvioso"] = (df_lluvia["precip_mm"] >= precip_minima).astype(int)
 
 #Criterio para mes lluvioso?
+precip_mes_minima = 100.0
+df_lluvia["mes"] = df_lluvia["fecha"].dt.month
+df_lluvia["anio"] = df_lluvia["fecha"].dt.year #lo uso para identificar el mes según el año para diferenciarlos
 
+group_by_cols = ["anio", "mes"]
+df_mes = (
+    df_lluvia
+    .groupby(group_by_cols, as_index=False)["precip_mm"]
+    .sum()
+    .rename(columns = {"precip_mm": "precip_mm_mes"})
+)
 
-df_global = df_lluvia
+df_mes["mes_lluvioso"] = (df_mes["precip_mm_mes"] >= precip_mes_minima).astype(int)
+df_lluvia = df_lluvia.merge(df_mes[group_by_cols + ["precip_mm_mes","mes_lluvioso"]], on=group_by_cols, how="left")
+
+df_global = df_lluvia.copy()
+
 
 #=====Humedad==========
 
