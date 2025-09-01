@@ -12,11 +12,9 @@ def cargarDataset(nombre):
     else:
         raise ValueError(f"Dataset '{nombre}' no encontrado.")
 
-cols_excluir = ["dia_lluvioso", "fecha"]  # columnas a excluir
-
 def entropia(S, objetivo):
-    col_objetivo = S[objetivo].dropna()  #! TEMPORAL borro NaN
-    filas = len(col_objetivo)
+    col_objetivo = S[objetivo] 
+    filas = len(S[objetivo])
     C = col_objetivo.unique() #caso binario [1,0]
     val = 0
     ocurrs = col_objetivo.value_counts() #cuenta ocurrencias de cada ci 
@@ -26,10 +24,6 @@ def entropia(S, objetivo):
     return val
 
 def ganancia(S, A, objetivo, entropia_S):
-    # S: dataframe completo
-    # A: nombre de la columna a evaluar
-    S = S.dropna(subset=[A])  #! TEMPORAL borro NaN
-    #entropia_S = entropia(S, objetivo)
     col_A = S[A]
     filas = len(col_A)
     C = col_A.unique()
@@ -43,16 +37,16 @@ def ganancia(S, A, objetivo, entropia_S):
     return ganancia
 
 
-def ganancias(S, objetivo):
-    entropia_S = entropia(S, objetivo) #ionce
-    atributos = list(S.columns)
-    for col in cols_excluir:
-        if col in atributos:
-            atributos.remove(col)
-    g = {}
-    for a in atributos:
-        g[a] = ganancia(S, a, objetivo, entropia_S)
-    return g
+# def ganancias(S, objetivo):
+#     entropia_S = entropia(S, objetivo) #ionce
+#     atributos = list(S.columns)
+#     for col in ["dia_lluvioso", "fecha"]: #no se usan como atributos
+#         if col in atributos:
+#             atributos.remove(col)
+#     g = {}
+#     for a in atributos:
+#         g[a] = ganancia(S, a, objetivo, entropia_S)
+#     return g
 
 def obtener_max_gan(S, A, objetivo):
     entropia_S = entropia(S, objetivo) #ionce
@@ -67,7 +61,7 @@ class Nodo:
     def __init__(self, atributo=None, valor=None, hijos=None, clasif=None):
         self.atributo = atributo  
         self.valor = valor        
-        self.hijos = hijos if hijos is not None else [] 
+        self.hijos = hijos if hijos is not None else {}
         self.clasif = clasif     
 
     def es_hoja(self):
@@ -88,12 +82,12 @@ def generacion_ID3(S, A, objetivo):
     raiz = Nodo()
     valores_iguales = S[objetivo].nunique() == 1 # todos los ejemplos tienen el mismo valor
     if valores_iguales:
-        raiz.clase = S[objetivo].iloc[0] #etiquetar con ese valor
+        raiz.clasif = S[objetivo].iloc[0] #etiquetar con ese valor
         return raiz
     elif len(A) == 0: # no me quedan atributos
         #etiquetar con el valor más común
         clase_mas_comun = S[objetivo].mode()[0] #valor mas comun, usa moda, si hay empate devuelve el primero pos [0]
-        raiz.clase = clase_mas_comun
+        raiz.clasif = clase_mas_comun
         return raiz
     else:
         mejor_atr = obtener_max_gan(S, A, objetivo) #atributo que mejor clasifica los ejemplos
@@ -104,15 +98,43 @@ def generacion_ID3(S, A, objetivo):
             if ej_vi.empty:
                 clase_mas_comun = S[objetivo].mode()[0]
                 nodo_hijo = Nodo(clasif=clase_mas_comun)
-                raiz.children[vi] = nodo_hijo
+                raiz.hijos[vi] = nodo_hijo
                 continue
                 #valor mas probable, de los q restan
             else:
                 A_nuevos = A.copy()
                 A_nuevos.remove(mejor_atr)
                 nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo)
-                raiz.children[vi] = nodo_hijo
+                raiz.hijos[vi] = nodo_hijo
     return raiz
+
+
+from graphviz import Digraph
+
+def graficar_arbol(nodo, dot=None, nombre="root"):
+    if dot is None:
+        dot = Digraph()
+    
+    if nodo.es_hoja():
+        if nodo.clasif == 1:
+            color = "lightgreen"
+            label = "SI"
+        else:
+            color = "lightcoral"  
+            label = "NO"
+
+        dot.node(nombre, label, shape="box", style="filled", color=color)
+    else:
+        dot.node(nombre, f"Atributo: {nodo.atributo}")
+        for valor, hijo in nodo.hijos.items():
+            hijo_nombre = f"{nombre}_{valor}"
+            dot.edge(nombre, hijo_nombre, label=str(valor))
+            graficar_arbol(hijo, dot, hijo_nombre)
+    return dot
+
+# Graficar y mostrar
+
+
 
 
 
