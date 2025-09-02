@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from math import log2
+from graphviz import Digraph
 
 dataframes = {}
 dataframes["data_dia"] = pd.read_csv("../Dataset_INUMET/data.csv", sep = ",", encoding='utf-8')
@@ -51,8 +52,7 @@ def obtener_max_gan(S, sA, objetivo):
     g = {}
     for a in sA:
         g[a] = ganancia(S, a, objetivo, entropia_S)
-    mayor = max(g, key=g.get) #mayor por valor no por entrada
-    return mayor
+    return g
 
 ## Gain Ratio y SplitInfo
 #A: Atributo
@@ -149,7 +149,7 @@ class Nodo:
 # ๏ Ejemplosvi={ejemplos en los cuales A=vi }
 # ๏ Si Ejemplosvi es vacío → etiquetar con el valor más probable
 # ๏ En caso contrario → ID3(Ejemplosvi, Atributos -{A})
-def generacion_ID3(S, A, objetivo):
+def generacion_ID3(S, A, objetivo, min_info_gain):
     raiz = Nodo()
     valores_iguales = S[objetivo].nunique() == 1 # todos los ejemplos tienen el mismo valor
     if valores_iguales:
@@ -161,9 +161,17 @@ def generacion_ID3(S, A, objetivo):
         raiz.clasif = clase_mas_comun
         return raiz
     else:
-        mejor_atr = obtener_max_gan(S, A, objetivo) #atributo que mejor clasifica los ejemplos
+        ranking_atrs = obtener_max_gan(S, A, objetivo) #atributo que mejor clasifica los ejemplos
+        #ranking_atrs = obtener_max_ir(S, A, objetivo) #atributo que mejor clasifica los ejemplos
+        #ranking_atrs = obtener_max_gain_ratio(S, A, objetivo) #atributo
+        mejor_atr = max(ranking_atrs, key=ranking_atrs.get) #mejor atributo
+        ganancia_max = ranking_atrs[mejor_atr]
+        if ganancia_max < min_info_gain:
+            clase_mas_comun = S[objetivo].mode()[0]
+            raiz.clasif = clase_mas_comun
+            return raiz
         raiz.atributo = mejor_atr 
-        vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo
+        vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
         for vi in vals_atr: #para cada valor vi de A 
             ej_vi = S[S[mejor_atr] == vi] 
             if ej_vi.empty:
@@ -175,13 +183,12 @@ def generacion_ID3(S, A, objetivo):
             else:
                 A_nuevos = A.copy()
                 A_nuevos.remove(mejor_atr)
-                nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo)
+                nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain)
                 raiz.hijos[vi] = nodo_hijo
     return raiz
 
 
-from graphviz import Digraph
-
+#Imprime el árbol usando graphviz
 def graficar_arbol(nodo, dot=None, nombre="root"):
     if dot is None:
         dot = Digraph()
