@@ -12,6 +12,10 @@ def cargarDataset(nombre):
     else:
         raise ValueError(f"Dataset '{nombre}' no encontrado.")
 
+
+## Método 1 : Ganancia 
+#S: dataset
+#objetivo: clasificacion
 def entropia(S, objetivo):
     col_objetivo = S[objetivo] 
     filas = len(S[objetivo])
@@ -23,6 +27,9 @@ def entropia(S, objetivo):
         val += - p_ci * log2(p_ci)
     return val
 
+#A: Atributo 
+#S: dataset
+#objetivo: clasificacion
 def ganancia(S, A, objetivo, entropia_S):
     col_A = S[A]
     filas = len(col_A)
@@ -36,25 +43,89 @@ def ganancia(S, A, objetivo, entropia_S):
     ganancia = entropia_S - val
     return ganancia
 
-
-# def ganancias(S, objetivo):
-#     entropia_S = entropia(S, objetivo) #ionce
-#     atributos = list(S.columns)
-#     for col in ["dia_lluvioso", "fecha"]: #no se usan como atributos
-#         if col in atributos:
-#             atributos.remove(col)
-#     g = {}
-#     for a in atributos:
-#         g[a] = ganancia(S, a, objetivo, entropia_S)
-#     return g
-
-def obtener_max_gan(S, A, objetivo):
+#sA: Set de atributos 
+#S: dataset
+#objetivo: clasificacion
+def obtener_max_gan(S, sA, objetivo):
     entropia_S = entropia(S, objetivo) #ionce
     g = {}
-    for a in A:
+    for a in sA:
         g[a] = ganancia(S, a, objetivo, entropia_S)
     mayor = max(g, key=g.get) #mayor por valor no por entrada
     return mayor
+
+## Gain Ratio y SplitInfo
+#A: Atributo
+#S: dataset
+def split_info(S, A):
+    col_A = S[A]
+    filas = len(col_A)
+    C = col_A.unique() #dominio de A(registrado)
+    val = 0
+    ocurrs = col_A.value_counts() #cuenta ocurrencias de cada ci
+    for ci in C:
+        sv_s = ocurrs[ci] / filas #|Sv|/|S|
+        val += - sv_s * log2(sv_s)
+    return val
+
+def gain_ratio(S, A, objetivo, entropia_S): 
+    g = ganancia(S, A, objetivo, entropia_S)
+    si = split_info(S, A)
+    if si == 0:
+        return 0
+    else:
+        return g / si
+
+def obtener_max_gain_ratio(S, sA, objetivo):
+    entropia_S = entropia(S, objetivo) #once
+    gr = {}
+    for a in sA:
+        gr[a] = gain_ratio(S, a, objetivo, entropia_S)
+    mayor = max(gr, key=gr.get) #mayor por valor no por entrada
+    return mayor
+
+## Impurity Reduction (Gini)
+
+#S: dataset
+#objetivo: clasificacion
+def gini(S, objetivo):
+    col_objetivo = S[objetivo] 
+    filas = len(S[objetivo])
+    C = col_objetivo.unique() #caso binario [1,0]
+    val = 1
+    ocurrs = col_objetivo.value_counts() #cuenta ocurrencias de cada ci 
+    for ci in C: #general, caso binario (-p+^2 - p-^2)
+        p_ci = ocurrs[ci] / filas
+        val -= p_ci ** 2
+    return val
+
+#A: Atributo
+#S: dataset
+#objetivo: clasificacion
+def impurity_reduction(S, A, objetivo, gini_S):
+    col_A = S[A]
+    filas = len(col_A)
+    C = col_A.unique()
+    val = 0
+    ocurrs = col_A.value_counts() #cuenta ocurrencias de cada ci
+    for ci in C:
+        sv_s = ocurrs[ci] / filas #|Sv|/|S|
+        gini_S_ci = gini(S[S[A] == ci], objetivo) #filtro por ci, trae todo el dataset que cumple con ci para atributo A
+        val += sv_s * gini_S_ci
+    ir = gini_S - val
+    return ir
+
+#sA: Set de atributos
+#S: dataset
+#objetivo: clasificacion
+def obtener_max_ir(S, sA, objetivo):
+    gini_S = gini(S, objetivo) #once
+    ir = {}
+    for a in sA:
+        ir[a] = impurity_reduction(S, a, objetivo, gini_S)
+    mayor = max(ir, key=ir.get) #mayor por valor no por entrada
+    return mayor
+
 
 ## def arbol
 class Nodo:
