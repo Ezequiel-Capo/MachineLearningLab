@@ -47,14 +47,16 @@ def ganancia(S, A, objetivo, entropia_S):
 #sA: Set de atributos 
 #S: dataset
 #objetivo: clasificacion
-def obtener_max_gan(S, sA, objetivo):
+def get_gains(S, sA, objetivo):
     entropia_S = entropia(S, objetivo) #ionce
     g = {}
     for a in sA:
         g[a] = ganancia(S, a, objetivo, entropia_S)
     return g
+#---------------------------------
 
 ## Gain Ratio y SplitInfo
+
 #A: Atributo
 #S: dataset
 def split_info(S, A):
@@ -76,16 +78,16 @@ def gain_ratio(S, A, objetivo, entropia_S):
     else:
         return g / si
 
-def obtener_max_gain_ratio(S, sA, objetivo):
+def get_gain_ratios(S, sA, objetivo):
     entropia_S = entropia(S, objetivo) #once
     gr = {}
     for a in sA:
         gr[a] = gain_ratio(S, a, objetivo, entropia_S)
-    mayor = max(gr, key=gr.get) #mayor por valor no por entrada
-    return mayor
+    return gr
+
+#--------------------------------
 
 ## Impurity Reduction (Gini)
-
 #S: dataset
 #objetivo: clasificacion
 def gini(S, objetivo):
@@ -118,13 +120,12 @@ def impurity_reduction(S, A, objetivo, gini_S):
 #sA: Set de atributos
 #S: dataset
 #objetivo: clasificacion
-def obtener_max_ir(S, sA, objetivo):
+def get_max_irs(S, sA, objetivo):
     gini_S = gini(S, objetivo) #once
     ir = {}
     for a in sA:
         ir[a] = impurity_reduction(S, a, objetivo, gini_S)
-    mayor = max(ir, key=ir.get) #mayor por valor no por entrada
-    return mayor
+    return ir
 
 
 ## def arbol
@@ -161,9 +162,9 @@ def generacion_ID3(S, A, objetivo, min_info_gain):
         raiz.clasif = clase_mas_comun
         return raiz
     else:
-        ranking_atrs = obtener_max_gan(S, A, objetivo) #atributo que mejor clasifica los ejemplos
-        #ranking_atrs = obtener_max_ir(S, A, objetivo) #atributo que mejor clasifica los ejemplos
-        #ranking_atrs = obtener_max_gain_ratio(S, A, objetivo) #atributo
+        #ranking_atrs = get_gains(S, A, objetivo) #atributo que mejor clasifica los ejemplos
+        #ranking_atrs = get_max_irs(S, A, objetivo) #atributo que mejor clasifica los ejemplos
+        ranking_atrs = get_gain_ratios(S, A, objetivo) #atributo
         mejor_atr = max(ranking_atrs, key=ranking_atrs.get) #mejor atributo
         ganancia_max = ranking_atrs[mejor_atr]
         if ganancia_max < min_info_gain:
