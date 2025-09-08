@@ -3,9 +3,12 @@ import pandas as pd
 import numpy as np
 from math import log2
 from graphviz import Digraph
-
+from sklearn.base import BaseEstimator, ClassifierMixin
+#---------------------------------
+# Carga de datos
 dataframes = {}
 dataframes["data_dia"] = pd.read_csv("../Dataset_INUMET/data.csv", sep = ",", encoding='utf-8')
+DOMINIOS = {col: dataframes["data_dia"][col].unique().tolist() for col in dataframes["data_dia"].columns if col != "fecha"}
 
 def cargarDataset(nombre):
     if nombre in dataframes:
@@ -150,7 +153,7 @@ class Nodo:
 # ๏ Ejemplosvi={ejemplos en los cuales A=vi }
 # ๏ Si Ejemplosvi es vacío → etiquetar con el valor más probable
 # ๏ En caso contrario → ID3(Ejemplosvi, Atributos -{A})
-def generacion_ID3(S, A, objetivo, min_info_gain):
+def generacion_ID3(S, A, objetivo, min_info_gain, criterio):
     raiz = Nodo()
     valores_iguales = S[objetivo].nunique() == 1 # todos los ejemplos tienen el mismo valor
     if valores_iguales:
@@ -162,9 +165,15 @@ def generacion_ID3(S, A, objetivo, min_info_gain):
         raiz.clasif = clase_mas_comun
         return raiz
     else:
-        #ranking_atrs = get_gains(S, A, objetivo) #atributo que mejor clasifica los ejemplos
-        #ranking_atrs = get_max_irs(S, A, objetivo) #atributo que mejor clasifica los ejemplos
-        ranking_atrs = get_gain_ratios(S, A, objetivo) #atributo
+        match criterio:
+            case "gain":
+                ranking_atrs = get_gains(S, A, objetivo)
+            case "gini":
+                ranking_atrs = get_max_irs(S, A, objetivo)
+            case "gain_ratio":
+                ranking_atrs = get_gain_ratios(S, A, objetivo)
+            case _:
+                raise ValueError("Criterio no válido. Usa 'gain', 'gini' o 'gain_ratio'.")
         mejor_atr = max(ranking_atrs, key=ranking_atrs.get) #mejor atributo
         ganancia_max = ranking_atrs[mejor_atr]
         if ganancia_max < min_info_gain:
@@ -172,7 +181,8 @@ def generacion_ID3(S, A, objetivo, min_info_gain):
             raiz.clasif = clase_mas_comun
             return raiz
         raiz.atributo = mejor_atr 
-        vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
+        #vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
+        vals_atr = DOMINIOS[mejor_atr]
         for vi in vals_atr: #para cada valor vi de A 
             ej_vi = S[S[mejor_atr] == vi] 
             if ej_vi.empty:
@@ -184,7 +194,7 @@ def generacion_ID3(S, A, objetivo, min_info_gain):
             else:
                 A_nuevos = A.copy()
                 A_nuevos.remove(mejor_atr)
-                nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain)
+                nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain, criterio)
                 raiz.hijos[vi] = nodo_hijo
     return raiz
 
@@ -193,15 +203,12 @@ def generacion_ID3(S, A, objetivo, min_info_gain):
 def graficar_arbol(nodo, dot=None, nombre="root"):
     if dot is None:
         dot = Digraph()
-    
+    label = str(nodo.clasif).upper()
     if nodo.es_hoja():
-        if nodo.clasif == 1:
+        if nodo.clasif == "si":
             color = "lightgreen"
-            label = "SI"
         else:
             color = "lightcoral"  
-            label = "NO"
-
         dot.node(nombre, label, shape="box", style="filled", color=color)
     else:
         dot.node(nombre, f"Atributo: {nodo.atributo}")
@@ -211,8 +218,46 @@ def graficar_arbol(nodo, dot=None, nombre="root"):
             graficar_arbol(hijo, dot, hijo_nombre)
     return dot
 
-# Graficar y mostrar
+#Prediccion/Clasificacion
+def predecir(nodo, ejemplo):
+    if nodo.es_hoja():
+        return nodo.clasif
+    valor = ejemplo[nodo.atributo]
+    if valor in nodo.hijos:
+        return predecir(nodo.hijos[valor], ejemplo)
+    else: 
+        raise ValueError(f"Valor '{valor}' del atributo '{nodo.atributo}' no encontrado en el árbol.")
+    
+class ID3Classifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, min_info_gain=0.0, criterio="gain_ratio"):
+        self.min_info_gain = min_info_gain
+        self.criterio = criterio
+        self.arbol = None
+        self.atributos = None
+        self.objetivo = None
 
+    def fit(self, X, y): #par generar valores y depositarlos en los atributos de la clase, que sea compatible con sklearn
+        # Combino X e y en un solo DataFrame (como espera tu generacion_ID3)
+        S = X.copy() 
+        self.objetivo = y.name
+        S[self.objetivo] = y
+        self.atributos = list(X.columns) 
+
+        # Genero árbol con tu función
+        self.arbol = generacion_ID3(
+            S,
+            self.atributos.copy(),
+            self.objetivo,
+            self.min_info_gain,
+            self.criterio
+        )
+        return self
+
+    def predict(self, X):
+        preds = []
+        for _, row in X.iterrows(): #iterar sobre los valores
+            preds.append(predecir(self.arbol, row))
+        return preds
 
 
 
