@@ -8,6 +8,8 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 # Carga de datos
 dataframes = {}
 dataframes["data_dia"] = pd.read_csv("../Dataset_INUMET/data.csv", sep = ",", encoding='utf-8')
+dataframes["data_dia_rf"] = pd.read_csv("../Dataset_INUMET/dataRandomForest.csv", sep = ",", encoding='utf-8')
+
 DOMINIOS = {col: dataframes["data_dia"][col].unique().tolist() for col in dataframes["data_dia"].columns if col != "fecha"}
 
 def cargarDataset(nombre):
