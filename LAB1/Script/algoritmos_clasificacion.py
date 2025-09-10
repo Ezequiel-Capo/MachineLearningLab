@@ -261,7 +261,64 @@ class ID3Classifier(BaseEstimator, ClassifierMixin):
 
 
 
+class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, m = 1, nd = 3):
+        self.m = m 
+        self.nd = nd
+        self.probs_clase = {}
+        self.probs_cond = {}
+        self.classes = None
 
-        
 
+    def fit(self, X, y):
+        self.classes = np.unique(y)
+        n = len(y)
 
+        self.probs_clase = {c: (y == c).sum() / n for c in self.classes}
+        self.probs_cond = {c: {} for c in self.classes}
+        for col in X.columns:
+            valores = X[col].unique()
+            for c in self.classes:
+                X_c = X[y == c][col]
+                n_c = len(X_c)
+                self.probs_cond[c][col] = {}
+                for v in valores:
+                    count = (X_c == v).sum()
+                    prob = (count + self.m / len(valores)) / (n_c + self.m)
+                    self.probs_cond[c][col][v] = prob  
+        return self
+
+    def predict(self, X):
+        preds = []
+        for _, fila in X.iterrows():
+            p = {}
+            for c in self.classes:
+                log_prob = np.log(self.probs_clase[c])
+                for col, val in fila.items():
+                    if val in self.probs_cond[c][col]:
+                        prob = self.probs_cond[c][col][val]
+                    else:
+                        prob = 1 / (len(self.probs_cond[c][col]) + self.m)
+
+                    log_prob += np.log(prob)
+                p[c] = log_prob
+            preds.append(max(p, key=p.get))
+        return preds
+    
+    def predict_proba(self, X):
+        probs = []
+        for _, fila in X.iterrows():
+            p = {}
+            for c in self.classes:
+                log_prob = np.log(self.probs_clase[c])
+                for col, val in fila.items():
+                    prob = self.probs_cond[c][col].get(
+                        val, 1 / (len(self.probs_cond[c][col]) + self.m)
+                    )
+                    log_prob += np.log(prob)
+                p[c] = np.exp(log_prob)
+            total = sum(p.values())
+            probs.append([p[c] / total for c in self.classes])
+        return np.array(probs)
+
+    
