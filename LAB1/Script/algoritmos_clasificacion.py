@@ -262,54 +262,80 @@ class ID3Classifier(BaseEstimator, ClassifierMixin):
 
 
 class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(self, m = 1, nd = 3):
-        self.m = m 
-        self.nd = nd
+    def __init__(self, m=1):
+        """
+        Clasificador Naive Bayes categórico con suavización m-estimate.
+        
+        Parámetros:
+        -----------
+        m : float
+            Parámetro de suavización. Controla cuánto peso se da a la probabilidad a priori
+            cuando los datos observados son escasos.
+        """
+        self.m = m
         self.probs_clase = {}
         self.probs_cond = {}
-        self.classes = None
-
+        self.classes_ = None
 
     def fit(self, X, y):
-        self.classes = np.unique(y)
+        """
+        Ajusta el modelo con los datos de entrenamiento.
+        
+        Parámetros:
+        -----------
+        X : DataFrame de pandas
+            Variables predictoras (ya preprocesadas con lags/ventanas si corresponde).
+        y : Series o array
+            Variable objetivo (clases).
+        """
+        self.classes_ = np.unique(y)
         n = len(y)
 
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes}
-        self.probs_cond = {c: {} for c in self.classes}
+        # Probabilidades a priori de cada clase P(c)
+        self.probs_clase = {c: (y == c).sum() / n for c in self.classes_}
+
+        # Probabilidades condicionales P(x|c)
+        self.probs_cond = {c: {} for c in self.classes_}
         for col in X.columns:
             valores = X[col].unique()
-            for c in self.classes:
+            for c in self.classes_:
                 X_c = X[y == c][col]
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
                 for v in valores:
                     count = (X_c == v).sum()
+                    # suavización m-estimate
                     prob = (count + self.m / len(valores)) / (n_c + self.m)
-                    self.probs_cond[c][col][v] = prob  
+                    self.probs_cond[c][col][v] = prob
         return self
 
     def predict(self, X):
+        """
+        Predice la clase más probable para cada fila de X.
+        """
         preds = []
         for _, fila in X.iterrows():
             p = {}
-            for c in self.classes:
+            for c in self.classes_:
                 log_prob = np.log(self.probs_clase[c])
                 for col, val in fila.items():
-                    if val in self.probs_cond[c][col]:
-                        prob = self.probs_cond[c][col][val]
-                    else:
-                        prob = 1 / (len(self.probs_cond[c][col]) + self.m)
-
+                    # usa prob condicional si existe, si no aplica suavización mínima
+                    prob = self.probs_cond[c][col].get(
+                        val, 1 / (len(self.probs_cond[c][col]) + self.m)
+                    )
                     log_prob += np.log(prob)
                 p[c] = log_prob
             preds.append(max(p, key=p.get))
         return preds
-    
+
     def predict_proba(self, X):
+        """
+        Devuelve las probabilidades normalizadas de cada clase.
+        """
         probs = []
         for _, fila in X.iterrows():
             p = {}
-            for c in self.classes:
+            for c in self.classes_:
                 log_prob = np.log(self.probs_clase[c])
                 for col, val in fila.items():
                     prob = self.probs_cond[c][col].get(
@@ -318,7 +344,7 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
                     log_prob += np.log(prob)
                 p[c] = np.exp(log_prob)
             total = sum(p.values())
-            probs.append([p[c] / total for c in self.classes])
+            probs.append([p[c] / total for c in self.classes_])
         return np.array(probs)
 
     
