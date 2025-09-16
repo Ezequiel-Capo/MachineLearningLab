@@ -181,22 +181,20 @@ def generacion_ID3(S, A, objetivo, min_info_gain, criterio):
         if ganancia_max < min_info_gain:
             clase_mas_comun = S[objetivo].mode()[0]
             raiz.clasif = clase_mas_comun
-            return raiz
-        raiz.atributo = mejor_atr 
-        #vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
-        vals_atr = DOMINIOS[mejor_atr]
-        for vi in vals_atr: #para cada valor vi de A 
-            ej_vi = S[S[mejor_atr] == vi] 
-            if ej_vi.empty:
-                clase_mas_comun = S[objetivo].mode()[0]
-                nodo_hijo = Nodo(clasif=clase_mas_comun)
-                raiz.hijos[vi] = nodo_hijo
-                continue
-                #valor mas probable, de los q restan
-            else:
-                A_nuevos = A.copy()
-                A_nuevos.remove(mejor_atr)
-                nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain, criterio)
+        else:   
+            raiz.atributo = mejor_atr 
+            #vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
+            vals_atr = DOMINIOS[mejor_atr]
+            for vi in vals_atr: #para cada valor vi de A 
+                ej_vi = S[S[mejor_atr] == vi] 
+                if ej_vi.empty:
+                    clase_mas_comun = S[objetivo].mode()[0]
+                    nodo_hijo = Nodo(clasif=clase_mas_comun)
+                    #valor mas probable, de los q restan
+                else:
+                    A_nuevos = A.copy()
+                    A_nuevos.remove(mejor_atr)
+                    nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain, criterio)
                 raiz.hijos[vi] = nodo_hijo
     return raiz
 
@@ -238,14 +236,12 @@ class ID3Classifier(BaseEstimator, ClassifierMixin):
         self.atributos = None
         self.objetivo = None
 
-    def fit(self, X, y): #par generar valores y depositarlos en los atributos de la clase, que sea compatible con sklearn
-        # Combino X e y en un solo DataFrame (como espera tu generacion_ID3)
+    def fit(self, X, y):
         S = X.copy() 
         self.objetivo = y.name
         S[self.objetivo] = y
         self.atributos = list(X.columns) 
 
-        # Genero árbol con tu función
         self.arbol = generacion_ID3(
             S,
             self.atributos.copy(),
@@ -271,17 +267,16 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.probs_cond = {}
         self.classes = None
 
-
     def fit(self, X, y):
         self.classes = np.unique(y)
         n = len(y)
 
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes}
+        self.probs_clase = {c: (y == c).sum() / n for c in self.classes} #retorna {si: prob, no: prob}
         self.probs_cond = {c: {} for c in self.classes}
         for col in X.columns:
             valores = X[col].unique()
-            for c in self.classes:
-                X_c = X[y == c][col]
+            for c in self.classes: #para cada clase si no
+                X_c = X[y == c][col] # si: atributo, no: atributo
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
                 for v in valores:
