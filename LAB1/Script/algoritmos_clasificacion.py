@@ -4,6 +4,15 @@ import numpy as np
 from math import log2
 from graphviz import Digraph
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.model_selection import cross_validate, StratifiedKFold, train_test_split
+from sklearn.metrics import (
+    make_scorer, f1_score, recall_score, precision_score, accuracy_score, confusion_matrix
+)
+from sklearn.ensemble import RandomForestClassifier
+import algoritmos_clasificacion as t
+import numpy as np
+import pandas as pd
+
 #---------------------------------
 # Carga de datos
 dataframes = {}
@@ -181,22 +190,20 @@ def generacion_ID3(S, A, objetivo, min_info_gain, criterio):
         if ganancia_max < min_info_gain:
             clase_mas_comun = S[objetivo].mode()[0]
             raiz.clasif = clase_mas_comun
-            return raiz
-        raiz.atributo = mejor_atr 
-        #vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
-        vals_atr = DOMINIOS[mejor_atr]
-        for vi in vals_atr: #para cada valor vi de A 
-            ej_vi = S[S[mejor_atr] == vi] 
-            if ej_vi.empty:
-                clase_mas_comun = S[objetivo].mode()[0]
-                nodo_hijo = Nodo(clasif=clase_mas_comun)
-                raiz.hijos[vi] = nodo_hijo
-                continue
-                #valor mas probable, de los q restan
-            else:
-                A_nuevos = A.copy()
-                A_nuevos.remove(mejor_atr)
-                nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain, criterio)
+        else:   
+            raiz.atributo = mejor_atr 
+            #vals_atr = S[mejor_atr].value_counts().index.tolist() #valores del atributo, !cambiar por diccionario de Dominios!
+            vals_atr = DOMINIOS[mejor_atr]
+            for vi in vals_atr: #para cada valor vi de A 
+                ej_vi = S[S[mejor_atr] == vi] 
+                if ej_vi.empty:
+                    clase_mas_comun = S[objetivo].mode()[0]
+                    nodo_hijo = Nodo(clasif=clase_mas_comun)
+                    #valor mas probable, de los q restan
+                else:
+                    A_nuevos = A.copy()
+                    A_nuevos.remove(mejor_atr)
+                    nodo_hijo = generacion_ID3(ej_vi, A_nuevos, objetivo, min_info_gain, criterio)
                 raiz.hijos[vi] = nodo_hijo
     return raiz
 
@@ -238,14 +245,12 @@ class ID3Classifier(BaseEstimator, ClassifierMixin):
         self.atributos = None
         self.objetivo = None
 
-    def fit(self, X, y): #par generar valores y depositarlos en los atributos de la clase, que sea compatible con sklearn
-        # Combino X e y en un solo DataFrame (como espera tu generacion_ID3)
+    def fit(self, X, y):
         S = X.copy() 
         self.objetivo = y.name
         S[self.objetivo] = y
         self.atributos = list(X.columns) 
 
-        # Genero árbol con tu función
         self.arbol = generacion_ID3(
             S,
             self.atributos.copy(),
@@ -271,17 +276,16 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.probs_cond = {}
         self.classes = None
 
-
     def fit(self, X, y):
         self.classes = np.unique(y)
         n = len(y)
 
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes}
+        self.probs_clase = {c: (y == c).sum() / n for c in self.classes} #retorna {si: prob, no: prob}
         self.probs_cond = {c: {} for c in self.classes}
         for col in X.columns:
             valores = X[col].unique()
-            for c in self.classes:
-                X_c = X[y == c][col]
+            for c in self.classes: #para cada clase si no
+                X_c = X[y == c][col] # si: atributo, no: atributo
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
                 for v in valores:
@@ -324,3 +328,122 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         return np.array(probs)
 
     
+
+#Validar MOdel
+def to_iter(x): 
+    if isinstance(x, int):   
+        return range(x)      
+    return x 
+
+def split_data(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=20
+    )
+    return X_train, X_test, y_train, y_test
+
+def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=None, criterios=1):
+    # Definir validación cruzada 
+    kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+    results = []
+
+    if criterios != 1:
+        pos_label = 'si'
+    else:
+        pos_label = 1.0
+
+    scoring = {
+        'accuracy': make_scorer(accuracy_score),
+        'f1': make_scorer(f1_score, pos_label=pos_label),
+        'recall': make_scorer(recall_score, pos_label=pos_label),
+        'precision': make_scorer(precision_score, pos_label=pos_label)
+    }
+    for i in to_iter(criterios):
+        for j in hiperparams:
+            if criterios != 1:
+                print(f"--- Evaluando: Criterio={i}, Min_Info_Gain={j} ---")
+                model = ID3Classifier(min_info_gain=j, criterio=i)
+                cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
+                row = { 'criterio': i, 'min_info_gain': j, 
+                        'accuracy_mean': np.mean(cv_results['test_accuracy']),
+                        'accuracy_std': np.std(cv_results['test_accuracy']),
+                        'f1_mean': np.mean(cv_results['test_f1']),
+                        'f1_std': np.std(cv_results['test_f1']),
+                        'recall_mean': np.mean(cv_results['test_recall']),
+                        'recall_std': np.std(cv_results['test_recall']),
+                        'precision_mean': np.mean(cv_results['test_precision']),
+                        'precision_std': np.std(cv_results['test_precision'])}
+            else:
+                print(f"--- Evaluando: nro arboles={j} ---")
+                model = RandomForestClassifier(n_estimators=j, random_state=random_state)
+                cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
+                row = { 'n_estimators': j, 
+                        'accuracy_mean': np.mean(cv_results['test_accuracy']),
+                        'accuracy_std': np.std(cv_results['test_accuracy']),
+                        'f1_mean': np.mean(cv_results['test_f1']),
+                        'f1_std': np.std(cv_results['test_f1']),
+                        'recall_mean': np.mean(cv_results['test_recall']),
+                        'recall_std': np.std(cv_results['test_recall']),
+                        'precision_mean': np.mean(cv_results['test_precision']),
+                        'precision_std': np.std(cv_results['test_precision'])}
+                
+            results.append(row)
+
+    df_results = pd.DataFrame(results)
+    best_cfg_F = df_results.loc[df_results['f1_mean'].idxmax()]
+    best_cfg_A = df_results.loc[df_results['accuracy_mean'].idxmax()]
+    
+    return df_results, best_cfg_F, best_cfg_A
+
+def testearModelo(typeModel, best_cfg, X_train, y_train, X_test):
+    match typeModel:
+        case "ID3":
+            model = ID3Classifier(
+            min_info_gain=best_cfg['min_info_gain'],
+            criterio=best_cfg['criterio']
+            )
+        case "RF":
+            model = RandomForestClassifier(
+                n_estimators=int(best_cfg['n_estimators']), 
+            )
+        case _:
+            raise ValueError("Tipo de modelo no válido. Usa 'ID3' o 'RF")
+
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+
+    return y_pred
+
+def imprimirMetricas(typeModel, best_cfg, y_test, y_pred):
+    match typeModel:
+        case "ID3":
+            print("mejor criterio: ", best_cfg['criterio'], "mejor min_info_gain: ", best_cfg['min_info_gain'])
+            print("Accuracy :", accuracy_score(y_test, y_pred))
+            print("F1       :", f1_score(y_test, y_pred, pos_label='si'))
+            print("Recall   :", recall_score(y_test, y_pred, pos_label='si'))
+            print("Precision:", precision_score(y_test, y_pred, pos_label='si'))
+        case "RF":
+            print("nro arboles: ", int(best_cfg['n_estimators']))
+            print("Accuracy :", accuracy_score(y_test, y_pred))
+            print("F1       :", f1_score(y_test, y_pred, pos_label=1.0))
+            print("Recall   :", recall_score(y_test, y_pred, pos_label=1.0))
+            print("Precision:", precision_score(y_test, y_pred, pos_label=1.0))
+        case _:
+            raise ValueError("Tipo de modelo no válido. Usa 'ID3' o 'RF'")
+
+def print_CM(typeModel, y_test, y_pred):
+    if typeModel == "ID3":
+        labels = ['si', 'no']
+        index = ["Actual: si", "Actual: no"]
+        columns = ["Pred: si", "Pred: no"]
+    elif typeModel == "RF":
+        labels = [1.0, 0.0]  # o [0,1] según tu dataset
+        index = ["Actual: 1", "Actual: 0"]
+        columns = ["Pred: 1", "Pred: 0"]
+    else:
+        raise ValueError("Tipo de modelo no válido")
+    
+    cm = confusion_matrix(y_test, y_pred, labels=labels)
+    cm_df = pd.DataFrame(cm, index=index, columns=columns)
+    print(cm_df)

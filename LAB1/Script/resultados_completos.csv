@@ -1,0 +1,11 @@
+tipo,criterio,min_info_gain,Accuracy,F1,Recall,Precision,Actual,Pred,count
+metricas_mejor_F1,gini,0.0,0.6896551724137931,0.2791762013729977,0.271412680756396,0.287396937573616,,,
+metricas_mejor_Accuracy,gain_ratio,0.008,0.7706896551724138,0.06432160804020101,0.035595105672969966,0.3333333333333333,,,
+matriz_mejor_F1,,,,,,,Actual: si,Pred: si,244.0
+matriz_mejor_F1,,,,,,,Actual: no,Pred: si,605.0
+matriz_mejor_F1,,,,,,,Actual: si,Pred: no,655.0
+matriz_mejor_F1,,,,,,,Actual: no,Pred: no,2556.0
+matriz_mejor_Accuracy,,,,,,,Actual: si,Pred: si,32.0
+matriz_mejor_Accuracy,,,,,,,Actual: no,Pred: si,64.0
+matriz_mejor_Accuracy,,,,,,,Actual: si,Pred: no,867.0
+matriz_mejor_Accuracy,,,,,,,Actual: no,Pred: no,3097.0
