@@ -12,6 +12,8 @@ from sklearn.ensemble import RandomForestClassifier
 import algoritmos_clasificacion as t
 import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 
 #---------------------------------
 # Carga de datos
@@ -237,7 +239,7 @@ def predecir(nodo, ejemplo):
     else: 
         raise ValueError(f"Valor '{valor}' del atributo '{nodo.atributo}' no encontrado en el árbol.")
     
-class ID3Classifier(BaseEstimator, ClassifierMixin):
+class ID3Classifier(BaseEstimator, ClassifierMixin): #hereda de sklearn, para que fitee con las metricas y cv.
     def __init__(self, min_info_gain=0.0, criterio="gain_ratio"):
         self.min_info_gain = min_info_gain
         self.criterio = criterio
@@ -265,8 +267,6 @@ class ID3Classifier(BaseEstimator, ClassifierMixin):
         for _, row in X.iterrows(): #iterar sobre los valores
             preds.append(predecir(self.arbol, row))
         return preds
-
-
 
 class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self, m = 1, nd = 3):
@@ -361,7 +361,8 @@ def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=Non
     for i in to_iter(criterios):
         for j in hiperparams:
             if criterios != 1:
-                print(f"--- Evaluando: Criterio={i}, Min_Info_Gain={j} ---")
+                #DEBUG
+                #print(f"--- Evaluando: Criterio={i}, Min_Info_Gain={j} ---")
                 model = ID3Classifier(min_info_gain=j, criterio=i)
                 cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
                 row = { 'criterio': i, 'min_info_gain': j, 
@@ -410,9 +411,7 @@ def testearModelo(typeModel, best_cfg, X_train, y_train, X_test):
             raise ValueError("Tipo de modelo no válido. Usa 'ID3' o 'RF")
 
     model.fit(X_train, y_train)
-
     y_pred = model.predict(X_test)
-
     return y_pred
 
 def imprimirMetricas(typeModel, best_cfg, y_test, y_pred):
@@ -438,7 +437,7 @@ def print_CM(typeModel, y_test, y_pred):
         index = ["Actual: si", "Actual: no"]
         columns = ["Pred: si", "Pred: no"]
     elif typeModel == "RF":
-        labels = [1.0, 0.0]  # o [0,1] según tu dataset
+        labels = [1.0, 0.0]  
         index = ["Actual: 1", "Actual: 0"]
         columns = ["Pred: 1", "Pred: 0"]
     else:
@@ -447,3 +446,47 @@ def print_CM(typeModel, y_test, y_pred):
     cm = confusion_matrix(y_test, y_pred, labels=labels)
     cm_df = pd.DataFrame(cm, index=index, columns=columns)
     print(cm_df)
+
+def graficar_matriz_confusion(y_test, y_pred, labels=None, title="Matriz de Confusión"):
+    cm = confusion_matrix(y_test, y_pred, labels=labels)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title(title)
+    plt.show()
+
+def funcGraficaError(df_results, metric="accuracy", modelo="ID3"):
+    if metric == "accuracy":
+        values = 1 - df_results["accuracy_mean"]
+        yerr = df_results["accuracy_std"]
+        label = "Accuracy error (1 - acc)"
+    elif metric == "f1":
+        values = 1 - df_results["f1_mean"]
+        yerr = df_results["f1_std"]
+        label = "F1 error (1 - F1)"
+    else:
+        raise ValueError("Métrica no soportada, usa 'accuracy' o 'f1'")
+    
+    plt.figure(figsize=(8,5))
+    
+    if modelo == "ID3":
+        for crit in df_results["criterio"].unique():
+            subset = df_results[df_results["criterio"] == crit]
+            plt.errorbar(
+                subset["min_info_gain"], 1 - subset[f"{metric}_mean"], 
+                yerr=subset[f"{metric}_std"], 
+                label=f"Criterio={crit}", marker="o", capsize=3
+            )
+        plt.xlabel("min_info_gain")
+    elif modelo == "RF":  
+        plt.errorbar(
+            df_results["n_estimators"], values,
+            yerr=yerr, 
+            label="RandomForest", marker="o", capsize=3
+        )
+        plt.xlabel("n_estimators")
+    
+    plt.ylabel(label)
+    plt.title(f"Curva de error vs hiperparámetros ({modelo})")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
