@@ -12,21 +12,32 @@ from sklearn.ensemble import RandomForestClassifier
 import algoritmos_clasificacion as t
 import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 
 #---------------------------------
 # Carga de datos
 dataframes = {}
-dataframes["data_dia"] = pd.read_csv("../Dataset_INUMET/data.csv", sep = ",", encoding='utf-8')
-dataframes["data_dia_rf"] = pd.read_csv("../Dataset_INUMET/dataRandomForest.csv", sep = ",", encoding='utf-8')
+dataframes["data_dia1"] = pd.read_csv("../Dataset_INUMET/datadia1.csv", sep=",", encoding="utf-8")
+dataframes["data_dia2"] = pd.read_csv("../Dataset_INUMET/datadia2.csv", sep=",", encoding="utf-8")
+dataframes["data_dia_c"] = pd.read_csv("../Dataset_INUMET/data_dia_c.csv", sep=",", encoding="utf-8")
 
-DOMINIOS = {col: dataframes["data_dia"][col].unique().tolist() for col in dataframes["data_dia"].columns if col != "fecha"}
+# Inicializamos como vacío y lo llenamos cuando se carga un dataset
+DOMINIOS = {}
 
 def cargarDataset(nombre):
+    global DOMINIOS  
+    
     if nombre in dataframes:
-        return dataframes[nombre]
+        dataset = dataframes[nombre]
+        # recalculamos los dominios dinámicamente
+        DOMINIOS = {
+            col: dataset[col].unique().tolist()
+            for col in dataset.columns if col != "fecha"
+        }
+        return dataset
     else:
         raise ValueError(f"Dataset '{nombre}' no encontrado.")
-
 
 ## Método 1 : Ganancia 
 #S: dataset
@@ -142,6 +153,8 @@ def get_max_irs(S, sA, objetivo):
     return ir
 
 
+
+
 ## def arbol
 class Nodo:
     def __init__(self, atributo=None, valor=None, hijos=None, clasif=None):
@@ -237,7 +250,7 @@ def predecir(nodo, ejemplo):
     else: 
         raise ValueError(f"Valor '{valor}' del atributo '{nodo.atributo}' no encontrado en el árbol.")
     
-class ID3Classifier(BaseEstimator, ClassifierMixin):
+class ID3Classifier(BaseEstimator, ClassifierMixin): #hereda de sklearn, para que fitee con las metricas y cv.
     def __init__(self, min_info_gain=0.0, criterio="gain_ratio"):
         self.min_info_gain = min_info_gain
         self.criterio = criterio
@@ -266,18 +279,34 @@ class ID3Classifier(BaseEstimator, ClassifierMixin):
             preds.append(predecir(self.arbol, row))
         return preds
 
-
-
 class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(self, m = 1, nd = 3):
-        self.m = m 
-        self.nd = nd
+    def __init__(self, m=1):
+        """
+        Clasificador Naive Bayes categórico con suavización m-estimate.
+        
+        Parámetros:
+        -----------
+        m : float
+            Parámetro de suavización. Controla cuánto peso se da a la probabilidad a priori
+            cuando los datos observados son escasos.
+        """
+        self.m = m
         self.probs_clase = {}
         self.probs_cond = {}
         self.classes = None
 
     def fit(self, X, y):
-        self.classes = np.unique(y)
+        """
+        Ajusta el modelo con los datos de entrenamiento.
+        
+        Parámetros:
+        -----------
+        X : DataFrame de pandas
+            Variables predictoras (ya preprocesadas con lags/ventanas si corresponde).
+        y : Series o array
+            Variable objetivo (clases).
+        """
+        self.classes_ = np.unique(y)
         n = len(y)
 
         self.probs_clase = {c: (y == c).sum() / n for c in self.classes} #retorna {si: prob, no: prob}
@@ -290,32 +319,38 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
                 self.probs_cond[c][col] = {}
                 for v in valores:
                     count = (X_c == v).sum()
+                    # suavización m-estimate
                     prob = (count + self.m / len(valores)) / (n_c + self.m)
-                    self.probs_cond[c][col][v] = prob  
+                    self.probs_cond[c][col][v] = prob
         return self
 
     def predict(self, X):
+        """
+        Predice la clase más probable para cada fila de X.
+        """
         preds = []
         for _, fila in X.iterrows():
             p = {}
-            for c in self.classes:
+            for c in self.classes_:
                 log_prob = np.log(self.probs_clase[c])
                 for col, val in fila.items():
-                    if val in self.probs_cond[c][col]:
-                        prob = self.probs_cond[c][col][val]
-                    else:
-                        prob = 1 / (len(self.probs_cond[c][col]) + self.m)
-
+                    # usa prob condicional si existe, si no aplica suavización mínima
+                    prob = self.probs_cond[c][col].get(
+                        val, 1 / (len(self.probs_cond[c][col]) + self.m)
+                    )
                     log_prob += np.log(prob)
                 p[c] = log_prob
             preds.append(max(p, key=p.get))
         return preds
-    
+
     def predict_proba(self, X):
+        """
+        Devuelve las probabilidades normalizadas de cada clase.
+        """
         probs = []
         for _, fila in X.iterrows():
             p = {}
-            for c in self.classes:
+            for c in self.classes_:
                 log_prob = np.log(self.probs_clase[c])
                 for col, val in fila.items():
                     prob = self.probs_cond[c][col].get(
@@ -324,7 +359,7 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
                     log_prob += np.log(prob)
                 p[c] = np.exp(log_prob)
             total = sum(p.values())
-            probs.append([p[c] / total for c in self.classes])
+            probs.append([p[c] / total for c in self.classes_])
         return np.array(probs)
 
     
@@ -361,7 +396,8 @@ def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=Non
     for i in to_iter(criterios):
         for j in hiperparams:
             if criterios != 1:
-                print(f"--- Evaluando: Criterio={i}, Min_Info_Gain={j} ---")
+                #DEBUG
+                #print(f"--- Evaluando: Criterio={i}, Min_Info_Gain={j} ---")
                 model = ID3Classifier(min_info_gain=j, criterio=i)
                 cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
                 row = { 'criterio': i, 'min_info_gain': j, 
@@ -392,8 +428,10 @@ def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=Non
     df_results = pd.DataFrame(results)
     best_cfg_F = df_results.loc[df_results['f1_mean'].idxmax()]
     best_cfg_A = df_results.loc[df_results['accuracy_mean'].idxmax()]
+    best_cfg_P = df_results.loc[df_results['precision_mean'].idxmax()]
+    best_cfg_R = df_results.loc[df_results['recall_mean'].idxmax()]
     
-    return df_results, best_cfg_F, best_cfg_A
+    return df_results, best_cfg_F, best_cfg_A, best_cfg_P, best_cfg_R
 
 def testearModelo(typeModel, best_cfg, X_train, y_train, X_test):
     match typeModel:
@@ -410,9 +448,7 @@ def testearModelo(typeModel, best_cfg, X_train, y_train, X_test):
             raise ValueError("Tipo de modelo no válido. Usa 'ID3' o 'RF")
 
     model.fit(X_train, y_train)
-
     y_pred = model.predict(X_test)
-
     return y_pred
 
 def imprimirMetricas(typeModel, best_cfg, y_test, y_pred):
@@ -438,7 +474,7 @@ def print_CM(typeModel, y_test, y_pred):
         index = ["Actual: si", "Actual: no"]
         columns = ["Pred: si", "Pred: no"]
     elif typeModel == "RF":
-        labels = [1.0, 0.0]  # o [0,1] según tu dataset
+        labels = [1.0, 0.0]  
         index = ["Actual: 1", "Actual: 0"]
         columns = ["Pred: 1", "Pred: 0"]
     else:
@@ -447,3 +483,46 @@ def print_CM(typeModel, y_test, y_pred):
     cm = confusion_matrix(y_test, y_pred, labels=labels)
     cm_df = pd.DataFrame(cm, index=index, columns=columns)
     print(cm_df)
+
+def graficar_matriz_confusion(y_test, y_pred, labels=None, title="Matriz de Confusión"):
+    cm = confusion_matrix(y_test, y_pred, labels=labels)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title(title)
+    plt.show()
+
+import matplotlib.pyplot as plt
+
+def funcGraficaError(df_results, metric="accuracy", modelo="ID3"):
+    if metric in ["accuracy", "f1", "precision", "recall"]:
+        values = 1 - df_results[f"{metric}_mean"]
+        yerr = df_results[f"{metric}_std"]
+        label = f"{metric.capitalize()} error (1 - {metric})"
+    else:
+        raise ValueError("Métrica no soportada, usa 'accuracy', 'f1', 'precision' o 'recall'")
+    
+    plt.figure(figsize=(8,5))
+    
+    if modelo == "ID3":
+        for crit in df_results["criterio"].unique():
+            subset = df_results[df_results["criterio"] == crit]
+            plt.errorbar(
+                subset["min_info_gain"], 1 - subset[f"{metric}_mean"], 
+                yerr=subset[f"{metric}_std"], 
+                label=f"Criterio={crit}", marker="o", capsize=3
+            )
+        plt.xlabel("min_info_gain")
+        
+    elif modelo == "RF":  
+        plt.errorbar(
+            df_results["n_estimators"], values,
+            yerr=yerr, 
+            label="RandomForest", marker="o", capsize=3
+        )
+        plt.xlabel("n_estimators")
+    
+    plt.ylabel(label)
+    plt.title(f"Curva de error vs hiperparámetros ({modelo})")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
