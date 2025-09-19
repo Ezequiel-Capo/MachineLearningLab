@@ -18,17 +18,26 @@ import matplotlib.pyplot as plt
 #---------------------------------
 # Carga de datos
 dataframes = {}
-dataframes["data_dia"] = pd.read_csv("../Dataset_INUMET/data.csv", sep = ",", encoding='utf-8')
-dataframes["data_dia_rf"] = pd.read_csv("../Dataset_INUMET/dataRandomForest.csv", sep = ",", encoding='utf-8')
+dataframes["data_dia1"] = pd.read_csv("../Dataset_INUMET/datadia1.csv", sep=",", encoding="utf-8")
+dataframes["data_dia2"] = pd.read_csv("../Dataset_INUMET/datadia2.csv", sep=",", encoding="utf-8")
+dataframes["data_dia_c"] = pd.read_csv("../Dataset_INUMET/data_dia_c.csv", sep=",", encoding="utf-8")
 
-DOMINIOS = {col: dataframes["data_dia"][col].unique().tolist() for col in dataframes["data_dia"].columns if col != "fecha"}
+# Inicializamos como vacío y lo llenamos cuando se carga un dataset
+DOMINIOS = {}
 
 def cargarDataset(nombre):
+    global DOMINIOS  
+    
     if nombre in dataframes:
-        return dataframes[nombre]
+        dataset = dataframes[nombre]
+        # recalculamos los dominios dinámicamente
+        DOMINIOS = {
+            col: dataset[col].unique().tolist()
+            for col in dataset.columns if col != "fecha"
+        }
+        return dataset
     else:
         raise ValueError(f"Dataset '{nombre}' no encontrado.")
-
 
 ## Método 1 : Ganancia 
 #S: dataset
@@ -142,6 +151,8 @@ def get_max_irs(S, sA, objetivo):
     for a in sA:
         ir[a] = impurity_reduction(S, a, objetivo, gini_S)
     return ir
+
+
 
 
 ## def arbol
@@ -393,8 +404,10 @@ def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=Non
     df_results = pd.DataFrame(results)
     best_cfg_F = df_results.loc[df_results['f1_mean'].idxmax()]
     best_cfg_A = df_results.loc[df_results['accuracy_mean'].idxmax()]
+    best_cfg_P = df_results.loc[df_results['precision_mean'].idxmax()]
+    best_cfg_R = df_results.loc[df_results['recall_mean'].idxmax()]
     
-    return df_results, best_cfg_F, best_cfg_A
+    return df_results, best_cfg_F, best_cfg_A, best_cfg_P, best_cfg_R
 
 def testearModelo(typeModel, best_cfg, X_train, y_train, X_test):
     match typeModel:
@@ -454,17 +467,15 @@ def graficar_matriz_confusion(y_test, y_pred, labels=None, title="Matriz de Conf
     plt.title(title)
     plt.show()
 
+import matplotlib.pyplot as plt
+
 def funcGraficaError(df_results, metric="accuracy", modelo="ID3"):
-    if metric == "accuracy":
-        values = 1 - df_results["accuracy_mean"]
-        yerr = df_results["accuracy_std"]
-        label = "Accuracy error (1 - acc)"
-    elif metric == "f1":
-        values = 1 - df_results["f1_mean"]
-        yerr = df_results["f1_std"]
-        label = "F1 error (1 - F1)"
+    if metric in ["accuracy", "f1", "precision", "recall"]:
+        values = 1 - df_results[f"{metric}_mean"]
+        yerr = df_results[f"{metric}_std"]
+        label = f"{metric.capitalize()} error (1 - {metric})"
     else:
-        raise ValueError("Métrica no soportada, usa 'accuracy' o 'f1'")
+        raise ValueError("Métrica no soportada, usa 'accuracy', 'f1', 'precision' o 'recall'")
     
     plt.figure(figsize=(8,5))
     
@@ -477,6 +488,7 @@ def funcGraficaError(df_results, metric="accuracy", modelo="ID3"):
                 label=f"Criterio={crit}", marker="o", capsize=3
             )
         plt.xlabel("min_info_gain")
+        
     elif modelo == "RF":  
         plt.errorbar(
             df_results["n_estimators"], values,
