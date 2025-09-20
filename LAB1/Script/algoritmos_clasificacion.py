@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 # Carga de datos
 dataframes = {}
 dataframes["data_dia1"] = pd.read_csv("../Dataset_INUMET/datadia1.csv", sep=",", encoding="utf-8")
-dataframes["data_dia2"] = pd.read_csv("../Dataset_INUMET/datadia2.csv", sep=",", encoding="utf-8")
 dataframes["data_dia_c"] = pd.read_csv("../Dataset_INUMET/data_dia_c.csv", sep=",", encoding="utf-8")
 
 # Inicializamos como vacío y lo llenamos cuando se carga un dataset
@@ -291,9 +290,7 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
             cuando los datos observados son escasos.
         """
         self.m = m
-        self.probs_clase = {}
-        self.probs_cond = {}
-        self.classes = None
+
 
     def fit(self, X, y):
         """
@@ -309,11 +306,11 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
         n = len(y)
 
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes} #retorna {si: prob, no: prob}
-        self.probs_cond = {c: {} for c in self.classes}
+        self.probs_clase = {c: (y == c).sum() / n for c in self.classes_} #retorna {si: prob, no: prob}
+        self.probs_cond = {c: {} for c in self.classes_}
         for col in X.columns:
             valores = X[col].unique()
-            for c in self.classes: #para cada clase si no
+            for c in self.classes_: #para cada clase si no
                 X_c = X[y == c][col] # si: atributo, no: atributo
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
