@@ -283,7 +283,7 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self, m=1):
         """
         Clasificador Naive Bayes categórico con suavización m-estimate.
-        
+
         Parámetros:
         -----------
         m : float
@@ -293,12 +293,12 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.m = m
         self.probs_clase = {}
         self.probs_cond = {}
-        self.classes = None
+        self.classes_ = None
 
     def fit(self, X, y):
         """
         Ajusta el modelo con los datos de entrenamiento.
-        
+
         Parámetros:
         -----------
         X : DataFrame de pandas
@@ -309,12 +309,14 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
         n = len(y)
 
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes} #retorna {si: prob, no: prob}
-        self.probs_cond = {c: {} for c in self.classes}
+        # Probabilidad a priori de cada clase
+        self.probs_clase = {c: (y == c).sum() / n for c in self.classes_}
+        self.probs_cond = {c: {} for c in self.classes_}
+
         for col in X.columns:
             valores = X[col].unique()
-            for c in self.classes: #para cada clase si no
-                X_c = X[y == c][col] # si: atributo, no: atributo
+            for c in self.classes_:
+                X_c = X[y == c][col]
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
                 for v in valores:
@@ -322,6 +324,7 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
                     # suavización m-estimate
                     prob = (count + self.m / len(valores)) / (n_c + self.m)
                     self.probs_cond[c][col][v] = prob
+
         return self
 
     def predict(self, X):
