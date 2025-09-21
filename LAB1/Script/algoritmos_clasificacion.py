@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 #---------------------------------
 # Carga de datos
 dataframes = {}
-dataframes["data_dia1"] = pd.read_csv("../Dataset_INUMET/datadia1.csv", sep=",", encoding="utf-8")
-dataframes["data_dia_c"] = pd.read_csv("../Dataset_INUMET/data_dia_c.csv", sep=",", encoding="utf-8")
+dataframes["data_dia1"] = pd.read_csv("../Datos_preprocesados/modelo1_vent1.csv", sep=",", encoding="utf-8")
+dataframes["data_dia_c"] = pd.read_csv("../Datos_preprocesados/data_dia_c.csv", sep=",", encoding="utf-8")
 
 # Inicializamos como vacío y lo llenamos cuando se carga un dataset
 DOMINIOS = {}
@@ -248,7 +248,7 @@ def predecir(nodo, ejemplo):
         return predecir(nodo.hijos[valor], ejemplo)
     else: 
         raise ValueError(f"Valor '{valor}' del atributo '{nodo.atributo}' no encontrado en el árbol.")
-    
+
 class ID3Classifier(BaseEstimator, ClassifierMixin): #hereda de sklearn, para que fitee con las metricas y cv.
     def __init__(self, min_info_gain=0.0, criterio="gain_ratio"):
         self.min_info_gain = min_info_gain
@@ -290,13 +290,9 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
             cuando los datos observados son escasos.
         """
         self.m = m
-<<<<<<< HEAD
-
-=======
         self.probs_clase = {}
         self.probs_cond = {}
         self.classes_ = None
->>>>>>> 5217867 (bayes dia lluvioso terminado)
 
     def fit(self, X, y):
         """
@@ -312,14 +308,6 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
         n = len(y)
 
-<<<<<<< HEAD
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes_} #retorna {si: prob, no: prob}
-        self.probs_cond = {c: {} for c in self.classes_}
-        for col in X.columns:
-            valores = X[col].unique()
-            for c in self.classes_: #para cada clase si no
-                X_c = X[y == c][col] # si: atributo, no: atributo
-=======
         # Probabilidad a priori de cada clase
         self.probs_clase = {c: (y == c).sum() / n for c in self.classes_}
         self.probs_cond = {c: {} for c in self.classes_}
@@ -328,7 +316,6 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
             valores = X[col].unique()
             for c in self.classes_:
                 X_c = X[y == c][col]
->>>>>>> 5217867 (bayes dia lluvioso terminado)
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
                 for v in valores:
@@ -377,8 +364,6 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
             probs.append([p[c] / total for c in self.classes_])
         return np.array(probs)
 
-    
-
 #Validar MOdel
 def to_iter(x): 
     if isinstance(x, int):   
@@ -389,14 +374,24 @@ def split_data(X, y):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y, random_state=20
     )
+    
     return X_train, X_test, y_train, y_test
+
+# def split_data(X, y):
+#     X_train, X_test, y_train, y_test = train_test_split(
+#         X, y, test_size=0.2, stratify=y, random_state=20
+#     )
+
+#     # Aplicar oversampling en el train. RES mejora recall, precision, pero baja entre un 20% el accuracy en testing
+#     ros = RandomOverSampler(random_state=20)
+#     X_train, y_train = ros.fit_resample(X_train, y_train)
+
+#     return X_train, X_test, y_train, y_test
 
 def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=None, criterios=1):
     # Definir validación cruzada 
     kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-
     results = []
-
     if criterios != 1:
         pos_label = 'si'
     else:
@@ -425,8 +420,8 @@ def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=Non
                         'precision_mean': np.mean(cv_results['test_precision']),
                         'precision_std': np.std(cv_results['test_precision'])}
             else:
-                print(f"--- Evaluando: nro arboles={j} ---")
-                model = RandomForestClassifier(n_estimators=j, random_state=random_state)
+                #print(f"--- Evaluando: nro arboles={j} ---")
+                model = RandomForestClassifier(n_estimators=j, random_state=random_state, class_weight="balanced")
                 cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
                 row = { 'n_estimators': j, 
                         'accuracy_mean': np.mean(cv_results['test_accuracy']),
@@ -506,9 +501,7 @@ def graficar_matriz_confusion(y_test, y_pred, labels=None, title="Matriz de Conf
     plt.title(title)
     plt.show()
 
-import matplotlib.pyplot as plt
-
-def funcGraficaError(df_results, metric="accuracy", modelo="ID3"):
+def funcGraficaError(df_results, metric="accuracy", modelo="ID3", ax=None):
     if metric in ["accuracy", "f1", "precision", "recall"]:
         values = 1 - df_results[f"{metric}_mean"]
         yerr = df_results[f"{metric}_std"]
@@ -516,28 +509,29 @@ def funcGraficaError(df_results, metric="accuracy", modelo="ID3"):
     else:
         raise ValueError("Métrica no soportada, usa 'accuracy', 'f1', 'precision' o 'recall'")
     
-    plt.figure(figsize=(8,5))
+    # Usar el eje si lo pasan
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8,5))
     
     if modelo == "ID3":
         for crit in df_results["criterio"].unique():
             subset = df_results[df_results["criterio"] == crit]
-            plt.errorbar(
+            ax.errorbar(
                 subset["min_info_gain"], 1 - subset[f"{metric}_mean"], 
                 yerr=subset[f"{metric}_std"], 
                 label=f"Criterio={crit}", marker="o", capsize=3
             )
-        plt.xlabel("min_info_gain")
+        ax.set_xlabel("min_info_gain")
         
     elif modelo == "RF":  
-        plt.errorbar(
+        ax.errorbar(
             df_results["n_estimators"], values,
             yerr=yerr, 
             label="RandomForest", marker="o", capsize=3
         )
-        plt.xlabel("n_estimators")
+        ax.set_xlabel("n_estimators")
     
-    plt.ylabel(label)
-    plt.title(f"Curva de error vs hiperparámetros ({modelo})")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    ax.set_ylabel(label)
+    ax.set_title(f"Curva de error vs hiperparámetros ({modelo})")
+    ax.legend()
+    ax.grid(True)
