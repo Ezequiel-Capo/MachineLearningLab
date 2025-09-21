@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
-from imblearn.over_sampling import RandomOverSampler
 
 #---------------------------------
 # Carga de datos
@@ -291,13 +290,9 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
             cuando los datos observados son escasos.
         """
         self.m = m
-<<<<<<< HEAD
-
-=======
         self.probs_clase = {}
         self.probs_cond = {}
         self.classes_ = None
->>>>>>> 5217867 (bayes dia lluvioso terminado)
 
     def fit(self, X, y):
         """
@@ -313,14 +308,6 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
         n = len(y)
 
-<<<<<<< HEAD
-        self.probs_clase = {c: (y == c).sum() / n for c in self.classes_} #retorna {si: prob, no: prob}
-        self.probs_cond = {c: {} for c in self.classes_}
-        for col in X.columns:
-            valores = X[col].unique()
-            for c in self.classes_: #para cada clase si no
-                X_c = X[y == c][col] # si: atributo, no: atributo
-=======
         # Probabilidad a priori de cada clase
         self.probs_clase = {c: (y == c).sum() / n for c in self.classes_}
         self.probs_cond = {c: {} for c in self.classes_}
@@ -329,7 +316,6 @@ class NaiveBayesClassifier(BaseEstimator, ClassifierMixin):
             valores = X[col].unique()
             for c in self.classes_:
                 X_c = X[y == c][col]
->>>>>>> 5217867 (bayes dia lluvioso terminado)
                 n_c = len(X_c)
                 self.probs_cond[c][col] = {}
                 for v in valores:
