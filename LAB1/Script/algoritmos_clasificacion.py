@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 # Carga de datos
 dataframes = {}
 dataframes["data_dia1"] = pd.read_csv("../Dataset_INUMET/datadia1.csv", sep=",", encoding="utf-8")
-dataframes["data_dia2"] = pd.read_csv("../Dataset_INUMET/datadia2.csv", sep=",", encoding="utf-8")
+#dataframes["data_dia2"] = pd.read_csv("../Dataset_INUMET/datadia2.csv", sep=",", encoding="utf-8")
 dataframes["data_dia_c"] = pd.read_csv("../Dataset_INUMET/data_dia_c.csv", sep=",", encoding="utf-8")
 
 # Inicializamos como vacío y lo llenamos cuando se carga un dataset
