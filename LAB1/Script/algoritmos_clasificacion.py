@@ -18,8 +18,10 @@ import matplotlib.pyplot as plt
 #---------------------------------
 # Carga de datos
 dataframes = {}
-dataframes["data_dia1"] = pd.read_csv("../Datos_preprocesados/modelo1_vent1.csv", sep=",", encoding="utf-8")
+dataframes["data_dia"] = pd.read_csv("../Datos_preprocesados/modelo1_vent1.csv", sep=",", encoding="utf-8")
+dataframes["data_mes"] = pd.read_csv("../Datos_preprocesados/modelo1_vent30.csv", sep=",", encoding="utf-8")
 dataframes["data_dia_c"] = pd.read_csv("../Datos_preprocesados/data_dia_c.csv", sep=",", encoding="utf-8")
+dataframes["data_mes_c"] = pd.read_csv("../Datos_preprocesados/data_mes_c.csv", sep=",", encoding="utf-8")
 
 # Inicializamos como vacío y lo llenamos cuando se carga un dataset
 DOMINIOS = {}
@@ -436,12 +438,14 @@ def validarModelo(X_train, y_train, random_state=10, n_splits=5, hiperparams=Non
             results.append(row)
 
     df_results = pd.DataFrame(results)
+
     best_cfg_F = df_results.loc[df_results['f1_mean'].idxmax()]
     best_cfg_A = df_results.loc[df_results['accuracy_mean'].idxmax()]
     best_cfg_P = df_results.loc[df_results['precision_mean'].idxmax()]
     best_cfg_R = df_results.loc[df_results['recall_mean'].idxmax()]
     
     return df_results, best_cfg_F, best_cfg_A, best_cfg_P, best_cfg_R
+    
 
 def testearModelo(typeModel, best_cfg, X_train, y_train, X_test):
     match typeModel:
@@ -501,6 +505,8 @@ def graficar_matriz_confusion(y_test, y_pred, labels=None, title="Matriz de Conf
     plt.title(title)
     plt.show()
 
+
+
 def funcGraficaError(df_results, metric="accuracy", modelo="ID3", ax=None):
     if metric in ["accuracy", "f1", "precision", "recall"]:
         values = 1 - df_results[f"{metric}_mean"]
@@ -535,3 +541,164 @@ def funcGraficaError(df_results, metric="accuracy", modelo="ID3", ax=None):
     ax.set_title(f"Curva de error vs hiperparámetros ({modelo})")
     ax.legend()
     ax.grid(True)
+
+
+## Bayes version:
+from sklearn.naive_bayes import MultinomialNB
+
+def split_bayes_sklearn(ruta_dataset,obj):
+    # Cargar dataset
+    S = pd.read_csv(ruta_dataset)
+
+    # Target y features
+    y = S[obj]
+    X = S.drop(columns=["dia_lluvioso","mes_lluvioso","fecha","amplitud_carrasco","amplitud_salto",
+                        "tprom_carrasco","tprom_salto","fase_lunar",
+                        "int_viento_carrasco_max","int_racha_viento_carrasco_max",
+                        "int_viento_salto_max","int_racha_viento_salto_max"])
+
+    # Convertir categorías a dummies (one-hot)
+    X_enc = pd.get_dummies(X.astype(str))
+
+    # Train/test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_enc, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    return X_train, X_test, y_train, y_test
+
+def validarNaiveBayes_sklearn(X_train, y_train, hiperparams=None, random_state=42, n_splits=5, pos_label='si', nd=1):
+    kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    results = []
+
+    scoring = {
+        'accuracy': make_scorer(accuracy_score),
+        'f1': make_scorer(f1_score, pos_label=pos_label),
+        'recall': make_scorer(recall_score, pos_label=pos_label),
+        'precision': make_scorer(precision_score, pos_label=pos_label)
+    }
+
+    for alpha in hiperparams:
+        # Crear modelo
+        model = MultinomialNB(alpha=alpha)
+
+        # Validación cruzada
+        cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
+
+        # Guardar resultados
+        row = {
+            'alpha': alpha,
+            'nd': nd,
+            'accuracy_mean': np.mean(cv_results['test_accuracy']),
+            'accuracy_std': np.std(cv_results['test_accuracy']),
+            'f1_mean': np.mean(cv_results['test_f1']),
+            'f1_std': np.std(cv_results['test_f1']),
+            'recall_mean': np.mean(cv_results['test_recall']),
+            'recall_std': np.std(cv_results['test_recall']),
+            'precision_mean': np.mean(cv_results['test_precision']),
+            'precision_std': np.std(cv_results['test_precision']),
+        }
+        results.append(row)
+
+    df_results = pd.DataFrame(results)
+
+
+    return df_results
+
+def testearBayesSickit(best_cfg, X_train, y_train, X_test, y_test):
+    model = MultinomialNB(alpha=best_cfg['alpha'])
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    # Calcular métricas
+    acc = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred, pos_label="si")
+    rec = recall_score(y_test, y_pred, pos_label="si")
+    prec = precision_score(y_test, y_pred, pos_label="si")
+
+    
+    return {
+        "y_pred": y_pred,
+        "accuracy": acc,
+        "f1": f1,
+        "recall": rec,
+        "precision": prec,
+    }
+
+
+def split_bayes(ruta_dataset, obj):
+
+    # Cargar dataset
+    S = pd.read_csv(ruta_dataset)
+
+    # Features y target
+    
+    y = S[obj]
+    X = S.drop(columns=["dia_lluvioso","mes_lluvioso","fecha", "amplitud_carrasco","amplitud_salto","tprom_carrasco","tprom_salto", "fase_lunar", 
+                        "int_viento_carrasco_max", "int_racha_viento_carrasco_max", "int_viento_salto_max", "int_racha_viento_salto_max"
+                        ])
+
+    # Train/test split
+    X_train, X_test, y_train, y_test = t.split_data(X, y)
+
+    return X_train, X_test, y_train, y_test
+
+def validarNaiveBayes(X_train, y_train, hiperparams=None, random_state=42, n_splits=5, pos_label='si', nd=1):
+
+    kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    results = []
+
+    scoring = {
+        'accuracy': make_scorer(accuracy_score),
+        'f1': make_scorer(f1_score, pos_label=pos_label),
+        'recall': make_scorer(recall_score, pos_label=pos_label),
+        'precision': make_scorer(precision_score, pos_label=pos_label)
+    }
+
+    for m in hiperparams:
+        # Crear modelo
+        model = t.NaiveBayesClassifier(m=m)
+        
+        # CV
+        cv_results = cross_validate(model, X_train, y_train, cv=kf, scoring=scoring)
+
+        # Guardar resultados
+        row = {
+            'm': m,
+            'nd': nd,
+            'accuracy_mean': np.mean(cv_results['test_accuracy']),
+            'accuracy_std': np.std(cv_results['test_accuracy']),
+            'f1_mean': np.mean(cv_results['test_f1']),
+            'f1_std': np.std(cv_results['test_f1']),
+            'recall_mean': np.mean(cv_results['test_recall']),
+            'recall_std': np.std(cv_results['test_recall']),
+            'precision_mean': np.mean(cv_results['test_precision']),
+            'precision_std': np.std(cv_results['test_precision']),
+        }
+        results.append(row)
+
+    df_results = pd.DataFrame(results)
+
+    return df_results
+
+def testearBayes(best_cfg, X_train, y_train, X_test, y_test):
+    
+    model = t.NaiveBayesClassifier(m=best_cfg['m'])
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    # Calcular métricas
+    acc = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred, pos_label="si")
+    rec = recall_score(y_test, y_pred, pos_label="si")
+    prec = precision_score(y_test, y_pred, pos_label="si")
+
+
+    return {
+        "y_pred": y_pred,
+        "accuracy": acc,
+        "f1": f1,
+        "recall": rec,
+        "precision": prec,
+    }
+
