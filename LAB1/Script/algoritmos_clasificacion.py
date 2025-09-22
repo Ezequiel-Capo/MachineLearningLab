@@ -553,7 +553,7 @@ def split_bayes_sklearn(ruta_dataset,obj):
     # Target y features
     y = S[obj]
     X = S.drop(columns=["dia_lluvioso","mes_lluvioso","fecha","amplitud_carrasco","amplitud_salto",
-                        "tprom_carrasco","tprom_salto","fase_lunar",
+                        "tprom_carrasco","tprom_salto",
                         "int_viento_carrasco_max","int_racha_viento_carrasco_max",
                         "int_viento_salto_max","int_racha_viento_salto_max"])
 
@@ -634,7 +634,7 @@ def split_bayes(ruta_dataset, obj):
     # Features y target
     
     y = S[obj]
-    X = S.drop(columns=["dia_lluvioso","mes_lluvioso","fecha", "amplitud_carrasco","amplitud_salto","tprom_carrasco","tprom_salto", "fase_lunar", 
+    X = S.drop(columns=["dia_lluvioso","mes_lluvioso","fecha", "amplitud_carrasco","amplitud_salto","tprom_carrasco","tprom_salto", 
                         "int_viento_carrasco_max", "int_racha_viento_carrasco_max", "int_viento_salto_max", "int_racha_viento_salto_max"
                         ])
 
