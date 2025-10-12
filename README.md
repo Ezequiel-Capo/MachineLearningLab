@@ -41,3 +41,58 @@ El proyecto, llamado **TorrAAca**, integra:
    - Astral
    - Numpy
    - Pandas
+
+## Laboratorio 2: Agentes de Aprendizaje por Refuerzo
+
+
+### Soluciones implementadas
+
+1. **Q-Learning Tabular**
+
+   * Aplicado al entorno no determinista.
+   * Entrenamiento mediante tabla Q con política ε-greedy y tasa de aprendizaje adaptativa.
+   * Evaluación de la política aprendida sobre múltiples episodios.
+
+2. **DQN (Deep Q-Network)**
+
+   * Aplicado al entorno no determinista
+   * Implementación de una red neuronal profunda para aproximar la función Q.
+   * Entrenamiento con *replay buffer* y política ε-greedy.
+
+
+### Tecnologías y librerías
+
+* `numpy`
+* `torch` (PyTorch)
+* `matplotlib`
+* `gymnasium` / `gym`
+* `collections` (para replay memory)
+
+
+### Criterios de éxito
+
+* Entrenamiento estable.
+* Política final con tasa de éxito **> 50%**.
+* Curvas de recompensa promedio que evidencien aprendizaje.
+
+
+## 📚 Estructura general del repositorio
+
+```
+MachineLearningLab/
+├── LAB1/
+│   ├── Script/
+│   │   ├── preprocesamiento.ipynb
+│   │   ├── algoritmos_clasificacion.py
+│   │   ├── eval_bayes_dia.ipynb
+│   │   ├── eval_bayes_mes.ipynb
+│   │   ├── eval_arboles_dia.ipynb
+│   │   └── eval_arboles_mes.ipynb
+│   └── Datos_preprocesados/
+│
+├── LAB2/
+│   ├── lab2.py
+│   ├── 
+│   ├── utils.py
+│
+└── README.md
