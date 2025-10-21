@@ -75,6 +75,7 @@ El proyecto, llamado **TorrAAca**, integra:
 * Política final con tasa de éxito **> 50%**.
 * Curvas de recompensa promedio que evidencien aprendizaje.
 
+**Se disponen archivos de carga para evaluación, los mismos disponen la Qtable (TABULAR) o pesos de la red neuronal (DQN) completa luego del entrenamiento definido, pero sin necesidad de repetirlo**
 
 ## 📚 Estructura general del repositorio
 
@@ -91,8 +92,9 @@ MachineLearningLab/
 │   └── Datos_preprocesados/
 │
 ├── LAB2/
-│   ├── lab2.py
-│   ├── 
-│   ├── utils.py
-│
+│   ├── lab2.ipynb
+│   ├── qtable_frozenlake_4x4.npy #carga Qtable
+│   ├── qtable_frozenlake_4x4.npy #carga Qtable
+│   ├── dqn_frozenlake_4x4.pth #carga pesos de RN
+│   ├── dqn_frozenlake_8x8.pth #carga pesos de RN
 └── README.md
